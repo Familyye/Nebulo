@@ -1,0 +1,95 @@
+image: thyrlian/android-sdk
+ 
+stages:
+ - check
+ - test
+ - build
+ 
+before_script:
+  - chmod +x gradlew
+ 
+prepare_release:
+  stage: check
+  script:
+    - chmod +x prepareRelease.sh
+    - ./prepareRelease.sh
+  only:
+    - release
+ 
+lint:
+  stage: test
+  script:
+    - ./gradlew lintStoreRelease
+    - ./gradlew lintFdroidRelease
+  except:
+    - master
+ 
+#test:
+#  stage: test
+#  script:
+#    - ./gradlew test
+ 
+build_debug:
+  stage: build
+  script:
+    - chmod +x changeVersion.sh
+    - ./changeVersion.sh app/build.gradle " $CI_COMMIT_REF_NAME\_$CI_PIPELINE_ID" --append
+    - ./gradlew assembleStoreDebug --stacktrace -x test
+  artifacts:
+    paths:
+    - app/build/outputs/apk/store/debug/*.apk
+    expire_in: 5 days
+  only:
+    - translations
+  except:
+    - release
+ 
+build_fdroid:
+  stage: build
+  script:
+    - wget -O $KEYSTORE_FILE $KEYSTORE_URL -q
+    - ./gradlew clean assembleFdroidRelease --stacktrace -x test
+  except:
+    - /^no_ci.*$/
+    - /^no_build.*$/
+    - /^no_build_no_tests.*$/
+    - /^no_build_no_deploy.*$/
+  artifacts:
+    paths:
+      - app/build/outputs/apk/fdroid/release/*.apk
+      - app/build/outputs/mapping/fdroid/release/mapping.txt
+    expire_in: 30 days
+  only:
+    - master
+    - release
+ 
+build_release:
+  stage: build
+  script:
+   - wget -O $KEYSTORE_FILE $KEYSTORE_URL -q
+   - ./gradlew clean assembleStoreRelease --stacktrace -x test
+  except:
+    - /^no_ci.*$/
+    - /^no_build.*$/
+    - /^no_build_no_tests.*$/
+    - /^no_build_no_deploy.*$/
+  artifacts:
+    paths:
+    - app/build/outputs/apk/store/release/*.apk
+    - app/build/outputs/mapping/store/release/mapping.txt
+    expire_in: 30 days
+  only:
+    - master
+    - release
+ 
+test_build_release:
+  stage: test
+  script:
+    - ./gradlew clean assembleStoreUnsignedRelease --stacktrace -x test
+  except:
+    - /^no_ci.*$/
+    - /^no_build.*$/
+    - /^no_build_no_tests.*$/
+    - /^no_build_no_deploy.*$/
+    - master
+    - release
